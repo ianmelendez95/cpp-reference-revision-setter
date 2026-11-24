@@ -2,10 +2,10 @@ const CPP_23_OPTION_LABEL = "C++23";
 
 async function setCppRevision() {
     const selectInput = await getRevisionSelectInputWithRetry(5);
-    const cpp23Option = getRevisionOptionEl(selectInput, CPP_23_OPTION_LABEL);
-    selectInput.value = cpp23Option.value;
+    const cpp23Value = getRevisionOptionValue(selectInput, CPP_23_OPTION_LABEL);
 
-    // selectInput.value = 6; // magic number, option 6 is C++ 23
+    selectInput.value = cpp23Value;
+    selectInput.dispatchEvent(new Event("change")); // trigger the change event so the page picks up the new value
 }
 
 /**
@@ -32,15 +32,15 @@ async function getRevisionSelectInputWithRetry(triesLeft) {
     return new Promise(resolve => {
         setTimeout(() => {
             resolve(getRevisionSelectInputWithRetry(triesLeft - 1));
-        }, 100);
+        }, 200);
     })
 }
 
-function getRevisionOptionEl(selectEl, optionLabel) {
+function getRevisionOptionValue(selectEl, optionLabel) {
     const options = selectEl.getElementsByTagName("OPTION");
     for (const option of options) {
         if (option.label === optionLabel) {
-            return option;
+            return option.value;
         }
     }
 
