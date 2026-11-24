@@ -3,12 +3,12 @@
     "description": "CPP Reference Revision Setter",
     "version": "1.0",
     "manifest_version": 3,
-    "action": {
-        "default_popup": "html/popup.html"
-    },
+    "permissions": [
+        "storage"
+    ],
     "content_scripts": [
         {
-            "js": ["js/set-revision.js"],
+            "js": ["js/setup.js"],
             "matches": [
                 "https://cppreference.com/*",
                 "https://*.cppreference.com/*"
