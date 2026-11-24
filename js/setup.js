@@ -1,12 +1,53 @@
+const CPP_SELECT_PARENT_ID = "cpp-head-tools-right";
 const CPP_REVISION_LABEL_STORAGE_KEY = "cpp-revision-value";
 const CPP_23_OPTION_LABEL = "C++23";
 
 async function setup() {
-    const selectEl = await getRevisionSelectWithRetry(5);
+    const selectEl = await waitForRevisionSelect();
     await setDesiredOption(selectEl);
     selectEl.addEventListener("change", handleRevisionSelectChange);
 }
 
+/**
+ * @returns {Promise<HTMLSelectElement>} promise resolving the select when it is added to the DOM
+ */
+function waitForRevisionSelect() {
+    const parentEl = document.getElementById(CPP_SELECT_PARENT_ID);
+    if (!parentEl) {
+        throw new Error("Couldn't find parent element with id: ", CPP_SELECT_PARENT_ID);
+    }
+
+    return new Promise((resolve, reject) => {
+        new MutationObserver(mutationList => {
+            for (const mutation of mutationList) {
+                for (const node of mutation.addedNodes) {
+                    if (!node.classList.contains("stdrev-select")) {
+                        continue;
+                    }
+
+                    const selects = node.getElementsByTagName("select");
+                    if (selects.length === 0) {
+                        reject("Unable to find selects in parent");
+                        return;
+                    }
+
+                    if (selects.length > 1) {
+                        reject("Found multiple selects in parent");
+                        return;
+                    }
+
+                    resolve(selects[0]);
+                }
+            }
+        }).observe(parentEl, {
+            childList: true
+        });
+    })
+}
+
+/**
+ * @param {HTMLSelectElement} selectEl 
+ */
 async function setDesiredOption(selectEl) {
     const desiredOptionLabel = (
         await browser.storage.sync.get(CPP_REVISION_LABEL_STORAGE_KEY)
@@ -28,6 +69,9 @@ async function setDesiredOption(selectEl) {
     selectEl.dispatchEvent(new Event("change")); // trigger the change event so the page picks up the new value
 }
 
+/**
+ * @param {Event} event 
+ */
 function handleRevisionSelectChange(event) {
     const newLabel = event.target.selectedOptions.item(0)?.label;
     if (newLabel) {
@@ -36,31 +80,6 @@ function handleRevisionSelectChange(event) {
             [CPP_REVISION_LABEL_STORAGE_KEY]: newLabel
         });
     }
-}
-
-/**
- * Attempts to resolve the revision select, retrying 'triesLeft' times 
- * until it finds it in the document, or throws if out of retries.
- * <p>
- * Without the retry implementation, the extension failed to find the input often. 
- */
-async function getRevisionSelectWithRetry(triesLeft) {
-    const queryResult = document.querySelector("div.stdrev-select select");
-    if (queryResult) {
-        return queryResult;
-    }
-
-    // couldn't find the input, so retry or throw
-    if (triesLeft <= 0) {
-        throw new Error("Couldn't find revision select element");
-    }
-
-    console.debug("Couldn't find revision select element, retrying");
-    return new Promise(resolve => {
-        setTimeout(() => {
-            resolve(getRevisionSelectWithRetry(triesLeft - 1));
-        }, 200); // settled on 200 after some informal testing, 100 still resulted in issues
-    })
 }
 
 setup();
