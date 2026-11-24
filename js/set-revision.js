@@ -1,21 +1,3 @@
-function findRevisionSelectInput() {
-    const selectDivs = document.getElementsByClassName("stdrev-select");
-    if (selectDivs.length === 0) {
-        return "No select div found";
-    } else if (selectDivs.length > 1) {
-        return "Multiple select divs found";
-    }
-
-    const selectInputs = selectDivs[0].getElementsByTagName("SELECT");
-    if (selectInputs.length === 0) {
-        return "No select input found";
-    } else if (selectInputs.length > 1) {
-        return "Multiple select inputs found";
-    }
-
-    return selectInputs[0];
-}
-
 /**
  * Attempts to resolve the revision select, retrying 'triesLeft' times 
  * until it finds it in the document, or throws the last error.
@@ -26,17 +8,17 @@ function findRevisionSelectInput() {
  * the DOM gets to fully resolve and the select is available to the extension.
  */
 async function findRevisionSelectInputWithRetry(triesLeft) {
-    const selectInputResult = findRevisionSelectInput();
-    if (typeof selectInputResult !== 'string') {
+    const selectInputResult = document.querySelector("div.stdrev-select select");
+    if (selectInputResult) {
         return selectInputResult;
     }
 
     // couldn't find the input, so retry or throw
     if (triesLeft <= 0) {
-        throw new Error(selectInputResult)
+        throw new Error("Couldn't find revision select element");
     }
 
-    console.log("Failed to find select div, retrying");
+    console.info("Couldn't find revision select element, retrying");
     return new Promise(resolve => {
         setTimeout(() => {
             resolve(findRevisionSelectInputWithRetry(triesLeft - 1));
