@@ -1,0 +1,16 @@
+{
+    "name": "CPP Reference Revision Setter",
+    "description": "CPP Reference Revision Setter",
+    "version": "1.0",
+    "manifest_version": 3,
+    "content_scripts": [
+        {
+            "js": ["cpp-revision-setter.js"],
+            "matches": [
+                "https://cppreference.com/*",
+                "https://*.cppreference.com/*"
+            ],
+            "run_at": "document_idle"
+        }
+    ]
+}
