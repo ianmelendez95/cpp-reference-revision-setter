@@ -5,7 +5,7 @@
     "manifest_version": 3,
     "content_scripts": [
         {
-            "js": ["cpp-revision-setter.js"],
+            "js": ["cpp-reference-revision-setter.js"],
             "matches": [
                 "https://cppreference.com/*",
                 "https://*.cppreference.com/*"

@@ -16,7 +16,16 @@ function findRevisionSelectInput() {
     return selectInputs[0];
 }
 
-async function getRevisionSelectInputWithRetry(triesLeft) {
+/**
+ * Attempts to resolve the revision select, retrying 'triesLeft' times 
+ * until it finds it in the document, or throws the last error.
+ * <p>
+ * Without the retry implementation, the extension failed to find the input
+ * fairly reliably. Ironically, with the async implementation, it seems to 
+ * always find it on the first try now. Perhaps just by deferring to the event loop
+ * the DOM gets to fully resolve and the select is available to the extension.
+ */
+async function findRevisionSelectInputWithRetry(triesLeft) {
     const selectInputResult = findRevisionSelectInput();
     if (typeof selectInputResult !== 'string') {
         return selectInputResult;
@@ -30,13 +39,13 @@ async function getRevisionSelectInputWithRetry(triesLeft) {
     console.log("Failed to find select div, retrying");
     return new Promise(resolve => {
         setTimeout(() => {
-            resolve(getRevisionSelectInputWithRetry(triesLeft - 1));
+            resolve(findRevisionSelectInputWithRetry(triesLeft - 1));
         }, 100);
     })
 }
 
 async function setCppRevision() {
-    const selectInput = await getRevisionSelectInputWithRetry(5);
+    const selectInput = await findRevisionSelectInputWithRetry(5);
     selectInput.value = 6; // magic number, option 6 is C++ 23
 }
 
