@@ -2,39 +2,45 @@ const CPP_REVISION_LABEL_STORAGE_KEY = "cpp-revision-value";
 const CPP_23_OPTION_LABEL = "C++23";
 
 async function setup() {
+    const selectEl = await getRevisionSelectWithRetry(5);
+    await setDesiredOption(selectEl);
+    selectEl.addEventListener("change", handleRevisionSelectChange);
+}
+
+async function setDesiredOption(selectEl) {
     const desiredOptionLabel = (
         await browser.storage.sync.get(CPP_REVISION_LABEL_STORAGE_KEY)
-    )[CPP_REVISION_LABEL_STORAGE_KEY] ?? CPP_23_OPTION_LABEL;
+    )[CPP_REVISION_LABEL_STORAGE_KEY];
 
-    // gather the select and associated options
-    const selectInput = await getRevisionSelectWithRetry(5);
-    const selectOptions = Array.from(selectInput.options);
-
-    // find the desired revision option, and select it
-    const desiredOption = selectOptions.find((option) => option.label === desiredOptionLabel);
-    if (!desiredOption) {
-        console.warn("Unable to find the desired option: ", desiredOptionLabel);
-    } else {
-        // set the desired option on the page
-        selectInput.value = desiredOption.value;
-        selectInput.dispatchEvent(new Event("change")); // trigger the change event so the page picks up the new value
+    if (!desiredOptionLabel) {
+        return;
     }
 
-    // setup change listener to persist user's desired option
-    selectInput.addEventListener("change", event => {
-        const newLabel = event.target.selectedOptions.item(0)?.label;
-        if (newLabel) {
-            console.info("User clicked option, storing: " + newLabel);
-            browser.storage.sync.set({
-                [CPP_REVISION_LABEL_STORAGE_KEY]: newLabel
-            });
-        }
-    });
+    const desiredOption = Array.from(selectEl.options).find(option => 
+        option.label === desiredOptionLabel
+    );
+    if (!desiredOption) {
+        console.warn("Unable to find the desired option: ", desiredOptionLabel);
+        return;
+    }
+
+    selectEl.value = desiredOption.value;
+    selectEl.dispatchEvent(new Event("change")); // trigger the change event so the page picks up the new value
+}
+
+function handleRevisionSelectChange(event) {
+    const newLabel = event.target.selectedOptions.item(0)?.label;
+    if (newLabel) {
+        console.debug("User clicked option, storing: " + newLabel);
+        browser.storage.sync.set({
+            [CPP_REVISION_LABEL_STORAGE_KEY]: newLabel
+        });
+    }
 }
 
 /**
  * Attempts to resolve the revision select, retrying 'triesLeft' times 
- * until it finds it in the document, or throws the last error.
+ * until it finds it in the document, or throws if out of retries.
  * <p>
  * Without the retry implementation, the extension failed to find the input often. 
  */
