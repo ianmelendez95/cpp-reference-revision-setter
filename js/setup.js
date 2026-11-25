@@ -1,11 +1,10 @@
 const CPP_SELECT_PARENT_ID = "cpp-head-tools-right";
-const CPP_REVISION_LABEL_STORAGE_KEY = "cpp-revision-value";
-const CPP_23_OPTION_LABEL = "C++23";
+const CPP_REVISION_VALUE_STORAGE_KEY = "cpp-revision-value";
 
 async function setup() {
     const selectEl = await waitForRevisionSelect();
-    await setDesiredOption(selectEl);
-    selectEl.addEventListener("change", handleRevisionSelectChange);
+    await setupDesiredOption(selectEl);
+    selectEl.addEventListener("change", handleSelectChange);
 }
 
 /**
@@ -18,7 +17,7 @@ function waitForRevisionSelect() {
     }
 
     return new Promise((resolve, reject) => {
-        new MutationObserver(mutationList => {
+        new MutationObserver((mutationList, observer) => {
             for (const mutation of mutationList) {
                 for (const node of mutation.addedNodes) {
                     if (!node.classList.contains("stdrev-select")) {
@@ -28,15 +27,16 @@ function waitForRevisionSelect() {
                     const selects = node.getElementsByTagName("select");
                     if (selects.length === 0) {
                         reject("Unable to find selects in parent");
-                        return;
-                    }
-
-                    if (selects.length > 1) {
+                    } else if (selects.length > 1) {
                         reject("Found multiple selects in parent");
-                        return;
+                    } else {
+                        resolve(selects[0]);
                     }
 
-                    resolve(selects[0]);
+                    // we already handled the stdrev-select, 
+                    // so we know we don't need to keep looking or observing
+                    observer.disconnect();
+                    return; 
                 }
             }
         }).observe(parentEl, {
@@ -48,37 +48,34 @@ function waitForRevisionSelect() {
 /**
  * @param {HTMLSelectElement} selectEl 
  */
-async function setDesiredOption(selectEl) {
-    const desiredOptionLabel = (
-        await browser.storage.sync.get(CPP_REVISION_LABEL_STORAGE_KEY)
-    )[CPP_REVISION_LABEL_STORAGE_KEY];
-
-    if (!desiredOptionLabel) {
+async function setupDesiredOption(selectEl) {
+    const desiredOptionValue = (
+        await browser.storage.sync.get(CPP_REVISION_VALUE_STORAGE_KEY)
+    )[CPP_REVISION_VALUE_STORAGE_KEY];
+    if (!desiredOptionValue) {
         return;
     }
 
-    const desiredOption = Array.from(selectEl.options).find(option => 
-        option.label === desiredOptionLabel
-    );
-    if (!desiredOption) {
-        console.warn("Unable to find the desired option: ", desiredOptionLabel);
-        return;
+    console.debug("User has selected value, setting: ", desiredOptionValue);
+    const isValidValue = Array.from(selectEl.options)
+        .map(option => option.value)
+        .contains(desiredOptionValue);
+    if (!isValidValue) {
+        throw new Error("Invalid option value: ", desiredOptionValue);
     }
 
-    selectEl.value = desiredOption.value;
+    selectEl.value = desiredOptionValue;
     selectEl.dispatchEvent(new Event("change")); // trigger the change event so the page picks up the new value
 }
 
 /**
  * @param {Event} event 
  */
-function handleRevisionSelectChange(event) {
-    const newLabel = event.target.selectedOptions.item(0)?.label;
-    if (newLabel) {
-        console.debug("User clicked option, storing: " + newLabel);
-        browser.storage.sync.set({
-            [CPP_REVISION_LABEL_STORAGE_KEY]: newLabel
-        });
+function handleSelectChange(event) {
+    const newValue = event.target.value;
+    if (newValue) {
+        console.debug("User clicked option, storing: " + newValue);
+        browser.storage.sync.set({[CPP_REVISION_VALUE_STORAGE_KEY]: newValue});
     }
 }
 
