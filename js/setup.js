@@ -26,13 +26,20 @@ async function waitForRevisionSelect() {
     }
 
     // Kick off the observer first, so it intercepts the addition of the select
-    const fromObserverPromise = new Promise((resolve, reject) => {
-        new MutationObserver((mutationList, observer) => {
+    return new Promise((resolve, reject) => {
+        const observer = new MutationObserver((mutationList, observer) => {
+            console.debug("Observing addition to parent");
             for (const mutation of mutationList) {
                 for (const node of mutation.addedNodes) {
                     if (!node.classList.contains("stdrev-select")) {
                         continue;
                     }
+
+                    console.debug("Observing addition of stdrev-select div");
+
+                    // we are handling the stdrev-select addition, 
+                    // so we know we don't need to keep looking or observing
+                    observer.disconnect();
 
                     const selects = node.getElementsByTagName("select");
                     if (selects.length === 0) {
@@ -40,31 +47,30 @@ async function waitForRevisionSelect() {
                     } else if (selects.length > 1) {
                         reject("Found multiple selects in parent");
                     } else {
+                        console.debug("Resolving found select");
                         resolve(selects[0]);
                     }
 
-                    // we already handled the stdrev-select, 
-                    // so we know we don't need to keep looking or observing
-                    observer.disconnect();
                     return; 
                 }
             }
-        }).observe(parentEl, {
-            childList: true
         });
+
+        observer.observe(parentEl, {childList: true});
+
+        // Immediately try to find it ourselves, accounting for the race condition where the 
+        // select was added before our observer could begin watching
+        const fromQuery = document.querySelector("div.stdrev-select select");
+
+        if (fromQuery) {
+            console.debug("Found select via DOM query");
+            observer.disconnect(); // cleanup, and also the reason this promise is not as clean as it could be
+            resolve(fromQuery);
+            return;
+        }
+
+        console.debug("Deferring to mutation observer");
     });
-
-    // Immediately try to find it ourselves, accounting for the race condition where the 
-    // select was added before our observer could begin watching
-    const fromQuery = document.querySelector("div.stdrev-select select");
-
-    if (fromQuery) {
-        console.debug("Found select via DOM query");
-        return fromQuery;
-    }
-
-    console.debug("Deferring to mutation observer");
-    return fromObserverPromise;
 }
 
 /**
