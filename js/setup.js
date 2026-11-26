@@ -3,8 +3,13 @@ const CPP_REVISION_VALUE_STORAGE_KEY = "cpp-revision-value";
 
 async function setup() {
     const selectEl = await waitForRevisionSelect();
+    if (!selectEl) {
+        return;
+    }
+
     await setupDesiredOption(selectEl);
     selectEl.addEventListener("change", handleSelectChange);
+    console.debug("Finished setup");
 }
 
 /**
@@ -13,7 +18,8 @@ async function setup() {
 function waitForRevisionSelect() {
     const parentEl = document.getElementById(CPP_SELECT_PARENT_ID);
     if (!parentEl) {
-        throw new Error("Couldn't find parent element with id: ", CPP_SELECT_PARENT_ID);
+        console.debug("Couldn't find parent element with id: ", CPP_SELECT_PARENT_ID);
+        return null;
     }
 
     return new Promise((resolve, reject) => {
@@ -53,25 +59,30 @@ async function setupDesiredOption(selectEl) {
         await browser.storage.sync.get(CPP_REVISION_VALUE_STORAGE_KEY)
     )[CPP_REVISION_VALUE_STORAGE_KEY];
     if (!desiredOptionValue) {
+        console.debug("User has no selected value, noop");
         return;
     }
 
     console.debug("User has selected value, setting: ", desiredOptionValue);
     const isValidValue = Array.from(selectEl.options)
         .map(option => option.value)
-        .contains(desiredOptionValue);
+        .includes(desiredOptionValue);
     if (!isValidValue) {
-        throw new Error("Invalid option value: ", desiredOptionValue);
+        console.error("Invalid option value, clearing: ", desiredOptionValue);
+        await browser.storage.sync.remove(CPP_REVISION_VALUE_STORAGE_KEY);
+        return;
     }
 
     selectEl.value = desiredOptionValue;
     selectEl.dispatchEvent(new Event("change")); // trigger the change event so the page picks up the new value
+    console.debug("Set desired value: ", desiredOptionValue);
 }
 
 /**
  * @param {Event} event 
  */
 function handleSelectChange(event) {
+    console.debug("User clicked option, handling");
     const newValue = event.target.value;
     if (newValue) {
         console.debug("User clicked option, storing: " + newValue);
