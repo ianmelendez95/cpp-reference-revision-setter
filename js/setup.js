@@ -1,4 +1,6 @@
-const CPP_SELECT_PARENT_ID = "cpp-head-tools-right";
+const CPP_REVISION_SELECT_PARENT_ID = "cpp-head-tools-right";
+const CPP_REVISION_SELECT_QUERY = "div.stdrev-select select";
+
 const CPP_REVISION_VALUE_STORAGE_KEY = "cpp-revision-value";
 
 async function setup() {
@@ -15,61 +17,68 @@ async function setup() {
 }
 
 /**
- * @returns {Promise<HTMLSelectElement>} promise resolving the select when it is added to the DOM
+ * @returns {Promise<HTMLSelectElement | null>} promise resolving the select when it is added to the DOM, or null if 
+ *                                              the parent element couldn't be found or a timeout
  */
-async function waitForRevisionSelect() {
-    const parentEl = document.getElementById(CPP_SELECT_PARENT_ID);
+async function waitForRevisionSelect(timeoutMs = 10000) {
+    const parentEl = document.getElementById(CPP_REVISION_SELECT_PARENT_ID);
 
     if (!parentEl) {
-        console.debug("Couldn't find parent element with id, likely not a relevant page: ", CPP_SELECT_PARENT_ID);
+        console.debug("Couldn't find parent element with id, likely not a relevant page: ", CPP_REVISION_SELECT_PARENT_ID);
         return null;
     }
 
-    // Kick off the observer first, so it intercepts the addition of the select
-    return new Promise((resolve, reject) => {
-        const observer = new MutationObserver((mutationList, observer) => {
+    // First, see if it's already in the dom
+    const fromQuery = parentEl.querySelector(CPP_REVISION_SELECT_QUERY);
+
+    if (fromQuery) {
+        console.debug("Found select via DOM query");
+        return fromQuery;
+    }
+
+    // We will store references to the observer and timeout
+    // created in the promise here, so that they are then available
+    // in the `.finally` of the promise.
+    let observer = null;
+    let timeout = null;
+
+    // Kick off the observer, so it intercepts the addition of the select.
+    // NOTE: There is no race condition where the select can be added before we begin observing,
+    // since the promise executor is executed synchronously during the constructor call
+    // as described in the MDN docs here: 
+    // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/Promise#description
+    return new Promise((resolve) => {
+        observer = new MutationObserver(() => {
             console.debug("Observing addition to parent");
-            for (const mutation of mutationList) {
-                for (const node of mutation.addedNodes) {
-                    if (!node.classList.contains("stdrev-select")) {
-                        continue;
-                    }
 
-                    console.debug("Observing addition of stdrev-select div");
-
-                    // we are handling the stdrev-select addition, 
-                    // so we know we don't need to keep looking or observing
-                    observer.disconnect();
-
-                    const selects = node.getElementsByTagName("select");
-                    if (selects.length === 0) {
-                        reject("Unable to find selects in parent");
-                    } else if (selects.length > 1) {
-                        reject("Found multiple selects in parent");
-                    } else {
-                        console.debug("Resolving found select");
-                        resolve(selects[0]);
-                    }
-
-                    return; 
-                }
+            const fromMutation = parentEl.querySelector(CPP_REVISION_SELECT_QUERY);
+            if (!fromMutation) {
+                console.debug("No select found in the mutation");
+                return;
             }
+
+            console.debug("Found select, resolving");
+            resolve(fromMutation);
         });
 
-        observer.observe(parentEl, {childList: true});
+        timeout = setTimeout(() => {
+            console.debug("Timed out waiting for mutation");
+            resolve(null);
+        }, timeoutMs);
 
-        // Immediately try to find it ourselves, accounting for the race condition where the 
-        // select was added before our observer could begin watching
-        const fromQuery = document.querySelector("div.stdrev-select select");
-
-        if (fromQuery) {
-            console.debug("Found select via DOM query");
-            observer.disconnect(); // cleanup, and also the reason this promise is not as clean as it could be
-            resolve(fromQuery);
-            return;
-        }
+        observer.observe(parentEl, {childList: true, subtree: true});
 
         console.debug("Deferring to mutation observer");
+    }).finally(() => {
+        console.debug("Observation promise complete, cleaning up");
+
+        if (observer) {
+            observer.disconnect();
+        }
+
+        if (timeout) {
+            clearTimeout(timeout);
+        }
     });
 }
 
@@ -83,6 +92,9 @@ async function setupDesiredOption(selectEl) {
 
     if (!desiredOptionValue) {
         console.debug("User has no selected value, noop");
+        return;
+    } else if (selectEl.value === desiredOptionValue) {
+        console.debug("Desired value is already selected, nothing to do");
         return;
     }
 
@@ -115,4 +127,4 @@ function handleSelectChange(event) {
     }
 }
 
-setup();
+setup().catch(err => console.error("Setup failed:", err));
