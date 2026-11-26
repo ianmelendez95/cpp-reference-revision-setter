@@ -10,8 +10,8 @@
         {
             "js": ["js/setup.js"],
             "matches": [
-                "https://cppreference.com/*",
-                "https://*.cppreference.com/*"
+                "https://cppreference.com/cpp/*",
+                "https://*.cppreference.com/cpp/*"
             ],
             "run_at": "document_idle"
         }

@@ -2,8 +2,10 @@ const CPP_SELECT_PARENT_ID = "cpp-head-tools-right";
 const CPP_REVISION_VALUE_STORAGE_KEY = "cpp-revision-value";
 
 async function setup() {
+    console.debug("Begin setup");
     const selectEl = await waitForRevisionSelect();
     if (!selectEl) {
+        console.debug("Couldn't find revision select");
         return;
     }
 
@@ -15,14 +17,16 @@ async function setup() {
 /**
  * @returns {Promise<HTMLSelectElement>} promise resolving the select when it is added to the DOM
  */
-function waitForRevisionSelect() {
+async function waitForRevisionSelect() {
     const parentEl = document.getElementById(CPP_SELECT_PARENT_ID);
+
     if (!parentEl) {
-        console.debug("Couldn't find parent element with id: ", CPP_SELECT_PARENT_ID);
+        console.debug("Couldn't find parent element with id, likely not a relevant page: ", CPP_SELECT_PARENT_ID);
         return null;
     }
 
-    return new Promise((resolve, reject) => {
+    // Kick off the observer first, so it intercepts the addition of the select
+    const fromObserverPromise = new Promise((resolve, reject) => {
         new MutationObserver((mutationList, observer) => {
             for (const mutation of mutationList) {
                 for (const node of mutation.addedNodes) {
@@ -48,7 +52,19 @@ function waitForRevisionSelect() {
         }).observe(parentEl, {
             childList: true
         });
-    })
+    });
+
+    // Immediately try to find it ourselves, accounting for the race condition where the 
+    // select was added before our observer could begin watching
+    const fromQuery = document.querySelector("div.stdrev-select select");
+
+    if (fromQuery) {
+        console.debug("Found select via DOM query");
+        return fromQuery;
+    }
+
+    console.debug("Deferring to mutation observer");
+    return fromObserverPromise;
 }
 
 /**
@@ -58,15 +74,18 @@ async function setupDesiredOption(selectEl) {
     const desiredOptionValue = (
         await browser.storage.sync.get(CPP_REVISION_VALUE_STORAGE_KEY)
     )[CPP_REVISION_VALUE_STORAGE_KEY];
+
     if (!desiredOptionValue) {
         console.debug("User has no selected value, noop");
         return;
     }
 
     console.debug("User has selected value, setting: ", desiredOptionValue);
+
     const isValidValue = Array.from(selectEl.options)
         .map(option => option.value)
         .includes(desiredOptionValue);
+
     if (!isValidValue) {
         console.error("Invalid option value, clearing: ", desiredOptionValue);
         await browser.storage.sync.remove(CPP_REVISION_VALUE_STORAGE_KEY);
